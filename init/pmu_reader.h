@@ -98,8 +98,8 @@ static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu)
         if (copied != sizeof(u64))
             break;
 
-        struct page *page = pfn_to_page(PHYS_PFN(val));
-        SetPageReferenced(page);
+        // struct page *page = pfn_to_page(PHYS_PFN(val));
+        // SetPageReferenced(page);
 
         pr_info("CPU %d consumed value: %llu\n", cpu, val);
     }
