@@ -18,7 +18,7 @@
 #include <asm/pgtable.h>
 #include <linux/page-flags.h>
 
-#define MY_USING_PMU
+// #define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
 #define TIMER_INTERVAL_MS (1000/18)
@@ -27,6 +27,7 @@ const int mem_store    = 0x82d0;
 const int mem_load     = 0x81d0;
 const int mem_any      = 0x83d0;
 
+#ifdef MY_USING_PMU
 static struct perf_event *pebs_event[16] = {NULL};
 
 struct percpu_kfifo {
@@ -172,6 +173,8 @@ static int perf_thread_fn(void *data)
     pr_info("perf_kthread: exiting\n");
     return 0;
 }
+
+#endif
 
 static void pmu_reader_init(void) {
 
