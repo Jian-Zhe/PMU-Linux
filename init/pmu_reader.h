@@ -18,7 +18,7 @@
 #include <asm/pgtable.h>
 #include <linux/page-flags.h>
 
-// #define MY_USING_PMU
+#define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
 #define TIMER_INTERVAL_MS (1000/18)

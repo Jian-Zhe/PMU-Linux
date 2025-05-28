@@ -865,9 +865,9 @@ enum folio_references {
 static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
-	// if(folio_test_clear_active(folio)) {
-	// 	return FOLIOREF_ACTIVATE;
-	// }
+	if(folio_test_clear_active(folio)) {
+		return FOLIOREF_ACTIVATE;
+	}
 
 	int referenced_ptes, referenced_folio;
 	unsigned long vm_flags;
