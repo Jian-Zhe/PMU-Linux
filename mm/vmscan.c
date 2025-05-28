@@ -866,6 +866,7 @@ static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
 	if(folio_test_clear_active(folio)) {
+		folio_clear_referenced(folio);
 		return FOLIOREF_ACTIVATE;
 	}
 
