@@ -16,6 +16,9 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <asm/pgtable.h>
+#include <linux/page-flags.h>
+
+#define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
 #define TIMER_INTERVAL_MS (1000/18)
@@ -98,10 +101,11 @@ static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu)
         if (copied != sizeof(u64))
             break;
 
-        // struct page *page = pfn_to_page(PHYS_PFN(val));
-        // SetPageReferenced(page);
+        struct page *page = pfn_to_page(PHYS_PFN(val));
+        struct folio *folio = page_folio(page); 
+        folio_set_active(folio);
 
-        pr_info("CPU %d consumed value: %llu\n", cpu, val);
+        // pr_info("CPU %d consumed value: %llu\n", cpu, val);
     }
 }
 
@@ -170,6 +174,8 @@ static int perf_thread_fn(void *data)
 }
 
 static void pmu_reader_init(void) {
+
+#ifdef MY_USING_PMU
     static struct task_struct *perf_kthread;
 
     printk(KERN_EMERG "<D> kthread init...\n");
@@ -177,5 +183,7 @@ static void pmu_reader_init(void) {
     if (IS_ERR(perf_kthread)) {
         pr_err("<D> Failed to create perf kthread\n");
     }
+#endif
+
 }
 
