@@ -865,17 +865,22 @@ enum folio_references {
 static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
-	if(folio_test_clear_active(folio)) {
-		folio_clear_referenced(folio);
-		return FOLIOREF_ACTIVATE;
-	}
-
-	int referenced_ptes, referenced_folio;
+	int referenced_ptes, referenced_folio, active_folio;
 	unsigned long vm_flags;
+
+	referenced_folio = folio_test_clear_referenced(folio);
+	active_folio = folio_test_clear_active(folio);
+
+	if(active_folio && referenced_folio) {
+		folio_set_referenced(folio);
+		return FOLIOREF_ACTIVATE;
+	} else if(active_folio) {
+		folio_set_referenced(folio);
+		return FOLIOREF_KEEP;
+	}
 
 	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
 					   &vm_flags);
-	referenced_folio = folio_test_clear_referenced(folio);
 
 	/*
 	 * The supposedly reclaimable folio was found to be in a VM_LOCKED vma.

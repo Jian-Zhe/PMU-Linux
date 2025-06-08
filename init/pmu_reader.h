@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <asm/pgtable.h>
 #include <linux/page-flags.h>
+#include <linux/interrupt.h>  // tasklet
 
 #define MY_USING_PMU
 
@@ -33,7 +34,7 @@ static struct perf_event *pebs_event[16] = {NULL};
 struct percpu_kfifo {
     struct kfifo fifo;
     char buffer[PMU_FIFO_SIZE];
-    struct hrtimer timer;
+    struct tasklet_struct tasklet;
 };
 
 static DEFINE_PER_CPU(struct percpu_kfifo, percpu_fifo);
@@ -52,6 +53,10 @@ static void perf_event_handler(struct perf_event *event,
     }
 
     kfifo_in(&buffer->fifo, (void*) &phy, sizeof(u64));
+
+    if(kfifo_avail(&buffer->fifo) >= PMU_FIFO_SIZE * 7 / 10) {
+        tasklet_schedule(&buffer->tasklet);
+    }
 }
 
 static void perf_init(void) {
@@ -110,59 +115,43 @@ static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu)
     }
 }
 
-static enum hrtimer_restart timer_callback(struct hrtimer *timer)
+// tasklet callback function
+static void consume_fifo_tasklet(unsigned long data)
 {
-    struct percpu_kfifo *fifo = this_cpu_ptr(&percpu_fifo);
+    struct percpu_kfifo *pkfifo = (struct percpu_kfifo *)data;
     int cpu = smp_processor_id();
 
-    // 消耗自己 CPU 的 buffer
-    consume_fifo(fifo, cpu);
-
-    // 重新啟動定時器
-    hrtimer_forward_now(timer, ms_to_ktime(TIMER_INTERVAL_MS));
-    return HRTIMER_RESTART;
+    pr_info("CPU %d tasklet running...\n", cpu);
+    consume_fifo(pkfifo, cpu);
 }
 
-static void init_timer_on_cpu(void *info)
+static void init_percpu_fifo(void *info)
 {
-    int cpu = smp_processor_id();
-    struct percpu_kfifo *pkfifo = &per_cpu(percpu_fifo, cpu);
-
+    struct percpu_kfifo *pkfifo = this_cpu_ptr(&percpu_fifo);
     kfifo_init(&pkfifo->fifo, pkfifo->buffer, PMU_FIFO_SIZE);
 
-    hrtimer_init(&pkfifo->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
-    pkfifo->timer.function = timer_callback;
-
-    hrtimer_start(&pkfifo->timer, ms_to_ktime(TIMER_INTERVAL_MS), HRTIMER_MODE_REL_PINNED);
+    // 初始化 tasklet，data 帶 pkfifo 指標
+    tasklet_init(&pkfifo->tasklet, consume_fifo_tasklet, (unsigned long)pkfifo);
 }
 
-static void timer_init(void) {
-    on_each_cpu(init_timer_on_cpu, NULL, 1);
-}
-
-static void stop_timer_on_cpu(void *info)
+static void exit_tasklet(void *info)
 {
-    int cpu = smp_processor_id();
-    struct percpu_kfifo *pkfifo = &per_cpu(percpu_fifo, cpu);
-    hrtimer_cancel(&pkfifo->timer);
-}
-
-static void timer_exit(void)
-{
-    on_each_cpu(stop_timer_on_cpu, NULL, 1);
+    struct percpu_kfifo *pkfifo = this_cpu_ptr(&percpu_fifo);
+    tasklet_kill(&pkfifo->tasklet);
 }
 
 static int perf_thread_fn(void *data)
 {
     perf_init();
-    timer_init();
+    on_each_cpu(init_percpu_fifo, NULL, 1);
 
     while (!kthread_should_stop()) {
         ssleep(10);
         // printk(KERN_EMERG "<D> kthread running...\n");
     }
 
-    timer_exit();
+    on_each_cpu(exit_tasklet, NULL, 1);
+
 
     for(int i = 0; i < 16; ++i) {
         if(pebs_event[i]) {
