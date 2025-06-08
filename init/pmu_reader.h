@@ -22,7 +22,6 @@
 #define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
-#define TIMER_INTERVAL_MS (1000/18)
 
 const int mem_store    = 0x82d0;
 const int mem_load     = 0x81d0;
@@ -50,6 +49,7 @@ static void perf_event_handler(struct perf_event *event,
     // circular buffer!
     if (kfifo_avail(&buffer->fifo) < sizeof(u64)) {
         kfifo_skip_count(&buffer->fifo, sizeof(u64));
+        pr_warn("PMU buffer full, skipping data\n");
     }
 
     kfifo_in(&buffer->fifo, (void*) &phy, sizeof(u64));
@@ -75,7 +75,7 @@ static void perf_init(void) {
     pebs_attr.config = mem_any;
 
     // 多少個事件紀錄一次
-    pebs_attr.sample_period = 8000;
+    pebs_attr.sample_period = 10000;
 
     // ip, addr, phys_addr
     // pebs_attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_ADDR | PERF_SAMPLE_PHYS_ADDR;
