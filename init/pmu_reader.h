@@ -19,7 +19,7 @@
 #include <linux/page-flags.h>
 #include <linux/interrupt.h>  // tasklet
 
-#define MY_USING_PMU
+// #define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
 
@@ -147,7 +147,7 @@ static int perf_thread_fn(void *data)
 
     while (!kthread_should_stop()) {
         ssleep(10);
-        // printk(KERN_EMERG "<D> kthread running...\n");
+        printk(KERN_EMERG "<D> kthread running...\n");
     }
 
     on_each_cpu(exit_tasklet, NULL, 1);
