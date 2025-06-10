@@ -19,7 +19,7 @@
 #include <linux/page-flags.h>
 #include <linux/interrupt.h>  // tasklet
 
-// #define MY_USING_PMU
+#define MY_USING_PMU
 
 #define PMU_FIFO_SIZE 5120
 
@@ -34,6 +34,7 @@ struct percpu_kfifo {
     struct kfifo fifo;
     char buffer[PMU_FIFO_SIZE];
     struct tasklet_struct tasklet;
+    int scheduled;
 };
 
 static DEFINE_PER_CPU(struct percpu_kfifo, percpu_fifo);
@@ -54,7 +55,8 @@ static void perf_event_handler(struct perf_event *event,
 
     kfifo_in(&buffer->fifo, (void*) &phy, sizeof(u64));
 
-    if(kfifo_avail(&buffer->fifo) >= PMU_FIFO_SIZE * 7 / 10) {
+    if(kfifo_avail(&buffer->fifo) >= PMU_FIFO_SIZE * 7 / 10 && !buffer->scheduled) {
+        buffer->scheduled = 1;
         tasklet_schedule(&buffer->tasklet);
     }
 }
@@ -97,8 +99,7 @@ static void perf_init(void) {
     }
 }
 
-static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu)
-{
+static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu) {
     u64 val;
     unsigned int copied;
 
@@ -110,8 +111,6 @@ static void consume_fifo(struct percpu_kfifo *pkfifo, int cpu)
         struct page *page = pfn_to_page(PHYS_PFN(val));
         struct folio *folio = page_folio(page); 
         folio_set_active(folio);
-
-        // pr_info("CPU %d consumed value: %llu\n", cpu, val);
     }
 }
 
@@ -122,6 +121,7 @@ static void consume_fifo_tasklet(unsigned long data)
     int cpu = smp_processor_id();
 
     pr_info("CPU %d tasklet running...\n", cpu);
+    pkfifo->scheduled = 0; // reset scheduled flag
     consume_fifo(pkfifo, cpu);
 }
 
@@ -134,47 +134,13 @@ static void init_percpu_fifo(void *info)
     tasklet_init(&pkfifo->tasklet, consume_fifo_tasklet, (unsigned long)pkfifo);
 }
 
-static void exit_tasklet(void *info)
-{
-    struct percpu_kfifo *pkfifo = this_cpu_ptr(&percpu_fifo);
-    tasklet_kill(&pkfifo->tasklet);
-}
-
-static int perf_thread_fn(void *data)
-{
-    perf_init();
-    on_each_cpu(init_percpu_fifo, NULL, 1);
-
-    while (!kthread_should_stop()) {
-        ssleep(10);
-        printk(KERN_EMERG "<D> kthread running...\n");
-    }
-
-    on_each_cpu(exit_tasklet, NULL, 1);
-
-
-    for(int i = 0; i < 16; ++i) {
-        if(pebs_event[i]) {
-            perf_event_release_kernel(pebs_event[i]);
-        }
-    }
-
-    pr_info("perf_kthread: exiting\n");
-    return 0;
-}
-
 #endif
 
 static void pmu_reader_init(void) {
 
 #ifdef MY_USING_PMU
-    static struct task_struct *perf_kthread;
-
-    printk(KERN_EMERG "<D> kthread init...\n");
-    perf_kthread = kthread_run(perf_thread_fn, NULL, "pmu_reader_kthread");
-    if (IS_ERR(perf_kthread)) {
-        pr_err("<D> Failed to create perf kthread\n");
-    }
+    perf_init();
+    on_each_cpu(init_percpu_fifo, NULL, 1);
 #endif
 
 }
