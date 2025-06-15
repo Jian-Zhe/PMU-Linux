@@ -1493,6 +1493,7 @@ static int __ref kernel_init(void *unused)
 
 	do_sysctl_args();
 
+	// init PMU reader
 	pmu_reader_init();
 
 	if (ramdisk_execute_command) {
