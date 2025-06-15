@@ -55,6 +55,7 @@ static void perf_event_handler(struct perf_event *event,
 
     kfifo_in(&buffer->fifo, (void*) &phy, sizeof(u64));
 
+    // 70% full, schedule tasklet
     if(kfifo_avail(&buffer->fifo) >= PMU_FIFO_SIZE * 7 / 10 && !buffer->scheduled) {
         buffer->scheduled = 1;
         tasklet_schedule(&buffer->tasklet);
@@ -94,7 +95,6 @@ static void perf_init(void) {
         pebs_event[i] = perf_event_create_kernel_counter(&pebs_attr, i, NULL, perf_event_handler, NULL);
         if (IS_ERR(pebs_event[i])) {
             pr_err("Failed to create PEBS event\n");
-            // return PTR_ERR(pebs_event[i]);
         }
     }
 }
@@ -130,7 +130,7 @@ static void init_percpu_fifo(void *info)
     struct percpu_kfifo *pkfifo = this_cpu_ptr(&percpu_fifo);
     kfifo_init(&pkfifo->fifo, pkfifo->buffer, PMU_FIFO_SIZE);
 
-    // 初始化 tasklet，data 帶 pkfifo 指標
+    // init tasklet
     tasklet_init(&pkfifo->tasklet, consume_fifo_tasklet, (unsigned long)pkfifo);
 }
 
