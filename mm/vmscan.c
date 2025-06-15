@@ -862,6 +862,10 @@ enum folio_references {
 	FOLIOREF_ACTIVATE,
 };
 
+#include <linux/ftrace.h>
+static int used = 0;
+static int total = 0;
+
 static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
@@ -870,12 +874,18 @@ static enum folio_references folio_check_references(struct folio *folio,
 
 	referenced_folio = folio_test_clear_referenced(folio);
 	active_folio = folio_test_clear_active(folio);
+	
+	total++;
+	trace_printk("used: %d\n", used);
+	trace_printk("total: %d\n", total);
 
 	if(active_folio && referenced_folio) {
 		folio_set_referenced(folio);
+		used++;
 		return FOLIOREF_ACTIVATE;
 	} else if(active_folio) {
 		folio_set_referenced(folio);
+		used++;
 		return FOLIOREF_KEEP;
 	}
 

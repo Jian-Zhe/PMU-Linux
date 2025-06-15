@@ -120,8 +120,8 @@ static void consume_fifo_tasklet(unsigned long data)
     struct percpu_kfifo *pkfifo = (struct percpu_kfifo *)data;
     int cpu = smp_processor_id();
 
-    pr_info("CPU %d tasklet running...\n", cpu);
     pkfifo->scheduled = 0; // reset scheduled flag
+    // pr_info("PMU tasklet running on CPU %d\n", cpu);
     consume_fifo(pkfifo, cpu);
 }
 
@@ -136,9 +136,11 @@ static void init_percpu_fifo(void *info)
 
 #endif
 
+
 static void pmu_reader_init(void) {
 
 #ifdef MY_USING_PMU
+    pr_info("PMU reader starts init\n");
     perf_init();
     on_each_cpu(init_percpu_fifo, NULL, 1);
 #endif
