@@ -1,4 +1,0 @@
-pmu_reader.h 負責初始化perf事件，以及處理事件buffer內的資訊
-會在kernel_init.c調用pmu_reader.h的pmu_reader_init
-
-vmscan.c主要修改在875~892行
