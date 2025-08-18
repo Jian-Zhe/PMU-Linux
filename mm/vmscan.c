@@ -863,43 +863,51 @@ enum folio_references {
 };
 
 // #include <linux/ftrace.h>
-static int used = 0;
+
 static int total = 0;
+static int diff = 0;
 
 static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
-	int referenced_ptes, referenced_folio, active_folio;
+	int referenced_folio, active_folio;
+	int referenced_ptes;
 	unsigned long vm_flags;
 
 	referenced_folio = folio_test_clear_referenced(folio);
 	active_folio = folio_test_clear_active(folio);
 
-	/** 
+	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
+					&vm_flags);
+
+	if(referenced_ptes > 0 && !active_folio) {
+		diff++;
+	} else if(referenced_ptes == 0 && active_folio) {
+		diff++;
+	}
 	total++;
-	trace_printk("used: %d\n", used);
-	trace_printk("total: %d\n", total);
-	*/
+
+	if(total % 1000 == 0) {
+		pr_info("DEBUG: total: %d, diff: %d\n", total, diff);
+	}
 
 	if(active_folio && referenced_folio) {
 		folio_set_referenced(folio);
-		used++;
 		return FOLIOREF_ACTIVATE;
 	} else if(active_folio) {
 		folio_set_referenced(folio);
-		used++;
 		return FOLIOREF_KEEP;
 	}
 
-	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
-					   &vm_flags);
+	// referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
+	// 				   &vm_flags);
 
 	/*
 	 * The supposedly reclaimable folio was found to be in a VM_LOCKED vma.
 	 * Let the folio, now marked Mlocked, be moved to the unevictable list.
 	 */
-	if (vm_flags & VM_LOCKED)
-		return FOLIOREF_ACTIVATE;
+	// if (vm_flags & VM_LOCKED)
+	// 	return FOLIOREF_ACTIVATE;
 
 	/*
 	 * There are two cases to consider.
@@ -907,37 +915,37 @@ static enum folio_references folio_check_references(struct folio *folio,
 	 * 2) Skip the non-shared swapbacked folio mapped solely by
 	 *    the exiting or OOM-reaped process.
 	 */
-	if (referenced_ptes == -1)
-		return FOLIOREF_KEEP;
+	// if (referenced_ptes == -1)
+	// 	return FOLIOREF_KEEP;
 
-	if (referenced_ptes) {
-		/*
-		 * All mapped folios start out with page table
-		 * references from the instantiating fault, so we need
-		 * to look twice if a mapped file/anon folio is used more
-		 * than once.
-		 *
-		 * Mark it and spare it for another trip around the
-		 * inactive list.  Another page table reference will
-		 * lead to its activation.
-		 *
-		 * Note: the mark is set for activated folios as well
-		 * so that recently deactivated but used folios are
-		 * quickly recovered.
-		 */
-		folio_set_referenced(folio);
+	// if (referenced_ptes) {
+	// 	/*
+	// 	 * All mapped folios start out with page table
+	// 	 * references from the instantiating fault, so we need
+	// 	 * to look twice if a mapped file/anon folio is used more
+	// 	 * than once.
+	// 	 *
+	// 	 * Mark it and spare it for another trip around the
+	// 	 * inactive list.  Another page table reference will
+	// 	 * lead to its activation.
+	// 	 *
+	// 	 * Note: the mark is set for activated folios as well
+	// 	 * so that recently deactivated but used folios are
+	// 	 * quickly recovered.
+	// 	 */
+	// 	folio_set_referenced(folio);
 
-		if (referenced_folio || referenced_ptes > 1)
-			return FOLIOREF_ACTIVATE;
+	// 	if (referenced_folio || referenced_ptes > 1)
+	// 		return FOLIOREF_ACTIVATE;
 
-		/*
-		 * Activate file-backed executable folios after first usage.
-		 */
-		if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio))
-			return FOLIOREF_ACTIVATE;
+	// 	/*
+	// 	 * Activate file-backed executable folios after first usage.
+	// 	 */
+	// 	if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio))
+	// 		return FOLIOREF_ACTIVATE;
 
-		return FOLIOREF_KEEP;
-	}
+	// 	return FOLIOREF_KEEP;
+	// }
 
 	/* Reclaim if clean, defer dirty folios to writeback */
 	if (referenced_folio && folio_is_file_lru(folio))

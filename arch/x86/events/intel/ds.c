@@ -597,15 +597,23 @@ static void dsfree_pages(const void *buffer, size_t size)
 
 static int alloc_pebs_buffer(int cpu)
 {
+	pr_info("alloc_pebs_buffer\n");
 	struct cpu_hw_events *hwev = per_cpu_ptr(&cpu_hw_events, cpu);
 	struct debug_store *ds = hwev->ds;
+	
+	// 204800
+	x86_pmu.pebs_buffer_size = 204800;
+
 	size_t bsiz = x86_pmu.pebs_buffer_size;
+	bsiz = 204800;
+	
 	int max, node = cpu_to_node(cpu);
 	void *buffer, *insn_buff, *cea;
 
 	if (!x86_pmu.pebs)
 		return 0;
 
+	pr_info("buffer size: %lu\n", bsiz);
 	buffer = dsalloc_pages(bsiz, GFP_KERNEL, cpu);
 	if (unlikely(!buffer))
 		return -ENOMEM;
@@ -629,6 +637,8 @@ static int alloc_pebs_buffer(int cpu)
 	ds_update_cea(cea, buffer, bsiz, PAGE_KERNEL);
 	ds->pebs_index = ds->pebs_buffer_base;
 	max = x86_pmu.pebs_record_size * (bsiz / x86_pmu.pebs_record_size);
+
+	pr_info("max: %d\n", max);
 	ds->pebs_absolute_maximum = ds->pebs_buffer_base + max;
 	return 0;
 }
@@ -736,6 +746,8 @@ void release_ds_buffers(void)
 
 void reserve_ds_buffers(void)
 {
+	pr_info("reserve_ds_buffers\n");
+	
 	int bts_err = 0, pebs_err = 0;
 	int cpu;
 
@@ -2154,6 +2166,7 @@ __intel_pmu_pebs_event(struct perf_event *event,
 					    struct perf_sample_data *,
 					    struct pt_regs *))
 {
+	// pr_info("n: %d\n", count);
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct hw_perf_event *hwc = &event->hw;
 	struct x86_perf_regs perf_regs;
@@ -2175,6 +2188,8 @@ __intel_pmu_pebs_event(struct perf_event *event,
 	if (!iregs)
 		iregs = &dummy_iregs;
 
+	// pr_info("start loop\n");
+	
 	while (count > 1) {
 		setup_sample(event, iregs, at, data, regs);
 		perf_event_output(event, data, regs);
@@ -2236,6 +2251,7 @@ static void intel_pmu_drain_pebs_core(struct pt_regs *iregs, struct perf_sample_
 		return;
 	}
 
+	pr_info("event count: %d\n", n);
 	__intel_pmu_pebs_event(event, iregs, data, at, top, 0, n,
 			       setup_pebs_fixed_sample_data);
 }
@@ -2261,6 +2277,7 @@ static void intel_pmu_pebs_event_update_no_drain(struct cpu_hw_events *cpuc, int
 
 static void intel_pmu_drain_pebs_nhm(struct pt_regs *iregs, struct perf_sample_data *data)
 {
+	// pr_info("nhm\n");
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct debug_store *ds = cpuc->ds;
 	struct perf_event *event;

@@ -658,6 +658,8 @@ int x86_pmu_hw_config(struct perf_event *event)
  */
 static int __x86_pmu_event_init(struct perf_event *event)
 {
+	pr_info("__x86_pmu_event_init\n");
+
 	int err;
 
 	if (!x86_pmu_initialized())
@@ -2434,6 +2436,8 @@ out:
 
 static int x86_pmu_event_init(struct perf_event *event)
 {
+	pr_info("x86_pmu_event_init\n");
+
 	struct x86_hybrid_pmu *pmu = NULL;
 	int err;
 

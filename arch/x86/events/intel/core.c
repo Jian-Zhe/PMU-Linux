@@ -6445,6 +6445,8 @@ static __always_inline void intel_pmu_init_skt(struct pmu *pmu)
 
 __init int intel_pmu_init(void)
 {
+	pr_info("intel_pmu_init\n");
+	
 	struct attribute **extra_skl_attr = &empty_attrs;
 	struct attribute **extra_attr = &empty_attrs;
 	struct attribute **td_attr    = &empty_attrs;

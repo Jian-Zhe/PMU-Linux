@@ -21,11 +21,14 @@
 
 #define MY_USING_PMU
 
-#define PMU_FIFO_SIZE 5120
+#define PMU_FIFO_SIZE 20480
 
 const int mem_store    = 0x82d0;
 const int mem_load     = 0x81d0;
 const int mem_any      = 0x83d0;
+const int l3_cache_load_miss = 0x20d1;
+const int l2_cache_load_miss = 0x10d1;
+const int l1_cache_load_miss = 0x08d1;
 
 #ifdef MY_USING_PMU
 static struct perf_event *pebs_event[16] = {NULL};
@@ -43,20 +46,20 @@ static void perf_event_handler(struct perf_event *event,
                                struct perf_sample_data *data,
                                struct pt_regs *regs)
 {
-    u64 phy = data->phys_addr;
 
     struct percpu_kfifo *buffer = this_cpu_ptr(&percpu_fifo);
 
     // circular buffer!
-    if (kfifo_avail(&buffer->fifo) < sizeof(u64)) {
-        kfifo_skip_count(&buffer->fifo, sizeof(u64));
+    if (kfifo_avail(&buffer->fifo) < 2*sizeof(u64)) {
+        kfifo_skip_count(&buffer->fifo, 2*sizeof(u64));
         pr_warn("PMU buffer full, skipping data\n");
     }
 
-    kfifo_in(&buffer->fifo, (void*) &phy, sizeof(u64));
+    u64 sample[2] = { data->phys_addr, data->ip };
+    kfifo_in(&buffer->fifo, sample, sizeof(sample));
 
     // 70% full, schedule tasklet
-    if(kfifo_avail(&buffer->fifo) >= PMU_FIFO_SIZE * 7 / 10 && !buffer->scheduled) {
+    if(kfifo_avail(&buffer->fifo) <= PMU_FIFO_SIZE * 3 / 10 && !buffer->scheduled) {
         buffer->scheduled = 1;
         tasklet_schedule(&buffer->tasklet);
     }
@@ -78,7 +81,7 @@ static void perf_init(void) {
     pebs_attr.config = mem_any;
 
     // 多少個事件紀錄一次
-    pebs_attr.sample_period = 10000;
+    pebs_attr.sample_period = 8000;
 
     // ip, addr, phys_addr
     // pebs_attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_ADDR | PERF_SAMPLE_PHYS_ADDR;

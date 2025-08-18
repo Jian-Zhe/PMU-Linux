@@ -462,7 +462,7 @@ int sysctl_perf_event_mlock __read_mostly = 512 + (PAGE_SIZE / 1024); /* 'free' 
 #define DEFAULT_SAMPLE_PERIOD_NS	(NSEC_PER_SEC / DEFAULT_MAX_SAMPLE_RATE)
 #define DEFAULT_CPU_TIME_MAX_PERCENT	25
 
-int sysctl_perf_event_sample_rate __read_mostly	= DEFAULT_MAX_SAMPLE_RATE;
+int sysctl_perf_event_sample_rate __read_mostly	= 300000; //= DEFAULT_MAX_SAMPLE_RATE;
 
 static int max_samples_per_tick __read_mostly	= DIV_ROUND_UP(DEFAULT_MAX_SAMPLE_RATE, HZ);
 static int perf_sample_period_ns __read_mostly	= DEFAULT_SAMPLE_PERIOD_NS;
@@ -506,7 +506,7 @@ int perf_event_max_sample_rate_handler(const struct ctl_table *table, int write,
 	return 0;
 }
 
-int sysctl_perf_cpu_time_max_percent __read_mostly = DEFAULT_CPU_TIME_MAX_PERCENT;
+int sysctl_perf_cpu_time_max_percent __read_mostly = 100;
 
 int perf_cpu_time_max_percent_handler(const struct ctl_table *table, int write,
 		void *buffer, size_t *lenp, loff_t *ppos)
@@ -7668,8 +7668,21 @@ void perf_output_sample(struct perf_output_handle *handle,
 	}
 }
 
+#include <linux/ktime.h>
+
+#define PROFILE_TIME_BEGIN(name) \
+    ktime_t __time_start_##name = ktime_get()
+
+#define PROFILE_TIME_END(name) do { \
+    ktime_t __time_end_##name = ktime_get(); \
+    s64 __delta_ns_##name = ktime_to_ns(ktime_sub(__time_end_##name, __time_start_##name)); \
+    pr_info("[TIME] %s: %lld ns\n", #name, __delta_ns_##name); \
+} while (0)
+
 static u64 perf_virt_to_phys(u64 virt)
 {
+	// PROFILE_TIME_BEGIN(perf_trans);
+
 	u64 phys_addr = 0;
 
 	if (!virt)
@@ -7700,6 +7713,7 @@ static u64 perf_virt_to_phys(u64 virt)
 		}
 	}
 
+	// PROFILE_TIME_END(perf_trans);
 	return phys_addr;
 }
 
@@ -7848,7 +7862,8 @@ void perf_prepare_sample(struct perf_sample_data *data,
 	__perf_event_header__init_id(data, event, filtered_sample_type);
 
 	if (filtered_sample_type & PERF_SAMPLE_IP) {
-		data->ip = perf_instruction_pointer(regs);
+		// translate to physical address
+		data->ip = perf_virt_to_phys(perf_instruction_pointer(regs));
 		data->sample_flags |= PERF_SAMPLE_IP;
 	}
 
