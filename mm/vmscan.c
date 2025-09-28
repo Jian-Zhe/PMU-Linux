@@ -877,9 +877,10 @@ static enum folio_references folio_check_references(struct folio *folio,
 	referenced_folio = folio_test_clear_referenced(folio);
 	active_folio = folio_test_clear_active(folio);
 
-	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
-					&vm_flags);
+	// referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup, &vm_flags);
 
+	/*
+	// comparing the result of rmap and pebs
 	if(referenced_ptes > 0 && !active_folio) {
 		diff++;
 	} else if(referenced_ptes == 0 && active_folio) {
@@ -890,7 +891,8 @@ static enum folio_references folio_check_references(struct folio *folio,
 	if(total % 1000 == 0) {
 		pr_info("DEBUG: total: %d, diff: %d\n", total, diff);
 	}
-
+	*/
+	
 	if(active_folio && referenced_folio) {
 		folio_set_referenced(folio);
 		return FOLIOREF_ACTIVATE;
